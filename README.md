@@ -1,5 +1,5 @@
 # lark-language-server
-Provides a language server for the Lark grammar.
+Provides a language server for grammars based on Lark
 
 ## Development
 
