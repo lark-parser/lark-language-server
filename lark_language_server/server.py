@@ -4,7 +4,7 @@ from pygls.features import (COMPLETION, TEXT_DOCUMENT_DID_CHANGE,
 from pygls.server import LanguageServer
 from pygls.types import (CompletionItem, CompletionList, CompletionParams, Diagnostic,
                          DidChangeTextDocumentParams,
-                         DidCloseTextDocumentParams, DidOpenTextDocumentParams, Position, Range)
+                         DidCloseTextDocumentParams, DidOpenTextDocumentParams)
 
 
 class LarkLanguageServer(LanguageServer):
