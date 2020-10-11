@@ -5,8 +5,10 @@ import logging
 
 from .server import lark_server
 
+open('lark-ls.log', 'w').close() # Clear logs on startup.
+
 # setup python logging to lark-ls.log
-logging.basicConfig(filename="lark-ls.log", level=logging.DEBUG, filemode="w")
+logging.basicConfig(format="%(levelname)s|%(name)s|%(asctime)s|%(message)s", filename="lark-ls.log", level=logging.DEBUG, filemode="w")
 
 
 def main():
