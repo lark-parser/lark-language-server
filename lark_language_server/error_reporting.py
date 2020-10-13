@@ -101,12 +101,6 @@ def get_diagnostics(doctext: str):
     error_function = lambda error: on_error(error, diagnostics)
     try:
         lark_grammar_parser.parse(doctext, on_error=error_function)
-    except UnexpectedCharacters:
-        diagnostics.append(
-            Diagnostic(
-                Range(Position(0, 0), Position(20, 20)), str("unknow")
-            )
-        )
     except Exception:
         logging.exception("parser raised exception")
         diagnostics.append(
