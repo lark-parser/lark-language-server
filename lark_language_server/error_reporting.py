@@ -1,52 +1,118 @@
 from typing import List, Union
 import logging
-from lark import UnexpectedToken, Token
-from pygls.types import (Diagnostic, Range, Position)
+from lark import UnexpectedToken, Token, UnexpectedCharacters
+from pygls.types import Diagnostic, Range, Position
+import re
 
 from .lark_grammar import lark_grammar_parser
 
 
 def user_repr(error: Union[UnexpectedToken]):
     if isinstance(error, UnexpectedToken):
-        expected = ', '.join(error.accepts or error.expected)
+        expected = ", ".join(error.accepts or error.expected)
         return f"Unexpected token {str(error.token)!r}. Expected one of:\n{{{expected}}}"
     else:
         return str(error)
 
+
 _SOLUTIONS = {
-    frozenset({'COLON', 'LBRACE', 'DOT'}): 'COLON',
-    frozenset({'RULE'}): 'RULE',
-    frozenset({'RPAR'}): 'RPAR',
-    frozenset({'RSQB'}): 'RSQB',
+    frozenset({"COLON", "LBRACE", "DOT"}): "COLON",
+    frozenset({"RULE"}): "RULE",
+    frozenset({"RPAR"}): "RPAR",
+    frozenset({"RSQB"}): "RSQB",
 }
+
+
+def on_token_error(e: UnexpectedToken, diagnostics: List[Diagnostic]):
+    t = e.token
+    diagnostics.append(
+        Diagnostic(
+            Range(
+                Position(t.line - 1, t.column - 1),
+                Position(t.end_line - 1, t.end_column - 1),
+            ),
+            user_repr(e),
+        )
+    )
+    if (
+        t.type == "_NL"
+    ):  # Try to save ourself from overreporting errors
+        logging.info(
+            repr((t, t.line, t.end_line, t.column, t.end_column))
+        )
+        accepts = e.puppet.accepts()
+        while frozenset(accepts) in _SOLUTIONS:
+            tt = _SOLUTIONS[frozenset(accepts)]
+            nt = Token.new_borrow_pos(tt, "<fill_token>", t)
+            e.puppet.feed_token(nt)
+            accepts = e.puppet.accepts()
+        if "_NL" not in accepts:
+            logging.warning(
+                "Unknown error situation with accepts: "
+                + str(accepts)
+            )
+        e.puppet.feed_token(t)
+    return True
+
+
+bad_char_re = re.compile("[^']", re.U)
+
+
+def on_character_error(
+    e: UnexpectedCharacters, diagnostics: List[Diagnostic]
+):
+    exception_msg = str(e)
+    skip_len = len("No terminal defined for '")
+    if bad_char_match := bad_char_re.match(exception_msg[skip_len:]):
+        bad_char = bad_char_match.group()
+    else:
+        bad_char = exception_msg[skip_len]
+
+    if bad_char != "'":
+        message = f"Unexpected character '{bad_char}' "
+    else:
+        message = f'Unexpected character "{bad_char}" '
+
+    if e.allowed:
+        message += "Expecting %s" % e.allowed
+
+    diagnostics.append(
+        Diagnostic(
+            Range(
+                Position(e.line - 1, e.column - 1),
+                Position(e.line, e.column - 1),
+            ),
+            message,
+        )
+    )
+    return True
+
+
+def on_error(e, diagnostics: List[Diagnostic]):
+    if isinstance(e, UnexpectedToken):
+        on_token_error(e, diagnostics)
+    elif isinstance(e, UnexpectedCharacters):
+        on_character_error(e, diagnostics)
+    return True
 
 
 def get_diagnostics(doctext: str):
     diagnostics: List[Diagnostic] = []
-
-    def on_error(e: UnexpectedToken):
-        t = e.token
-        diagnostics.append(Diagnostic(
-            Range(
-                Position(t.line - 1, t.column - 1),
-                Position(t.end_line - 1, t.end_column - 1)
-            ),
-            user_repr(e)))
-        if t.type == '_NL': # Try to save ourself from overreporting errors
-            logging.info(repr((t, t.line, t.end_line, t.column, t.end_column)))
-            accepts = e.puppet.accepts()
-            while frozenset(accepts) in _SOLUTIONS:
-                tt = _SOLUTIONS[frozenset(accepts)]
-                nt = Token.new_borrow_pos(tt, '<fill_token>', t)
-                e.puppet.feed_token(nt)
-                accepts = e.puppet.accepts()
-            if '_NL' not in accepts:
-                logging.warning('Unknown error situation with accepts: ' + str(accepts))
-            e.puppet.feed_token(t)
-        return True
-
+    error_function = lambda error: on_error(error, diagnostics)
     try:
-        lark_grammar_parser.parse(doctext, on_error=on_error)
+        lark_grammar_parser.parse(doctext, on_error=error_function)
+    except UnexpectedCharacters:
+        diagnostics.append(
+            Diagnostic(
+                Range(Position(0, 0), Position(20, 20)), str("unknow")
+            )
+        )
     except Exception:
         logging.exception("parser raised exception")
+        diagnostics.append(
+            Diagnostic(
+                Range(Position(0, 0), Position(20, 20)),
+                "Unknow error on language server, check log",
+            )
+        )
     return diagnostics

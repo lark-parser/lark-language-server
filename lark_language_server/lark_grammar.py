@@ -15,6 +15,7 @@ token_params: ["{" TOKEN ("," TOKEN)* "}"]
 
 priority: "." NUMBER
 
+
 statement: "%ignore" expansions                    -> ignore
          | "%import" import_path ["->" name]       -> import
          | "%import" import_path name_list         -> multi_import
@@ -51,6 +52,12 @@ STRING: _STRING "i"?
 REGEXP: /\/(?!\/)(\\\/|\\\\|[^\/\n])*?\/[imslux]*/
 _NL: /(\r?\n)+\s*/
 
+ARROW : "->"
+IGNORE_STATEMENT : "%ignore"
+IMPORT_STATEMENT : "%import"
+DECLARE_STATEMENT : "%declare"
+
+
 %import common.ESCAPED_STRING -> _STRING
 %import common.SIGNED_INT -> NUMBER
 %import common.WS_INLINE
@@ -61,4 +68,4 @@ COMMENT: /\s*/ "//" /[^\n]/*
 %ignore COMMENT
 """
 
-lark_grammar_parser = Lark(lark_grammer, parser='lalr')
+lark_grammar_parser = Lark(lark_grammer, parser="lalr")
