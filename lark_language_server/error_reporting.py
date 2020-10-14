@@ -1,9 +1,11 @@
+from contextlib import suppress
 from typing import List, Union
 import logging
-from lark import UnexpectedToken, Token
+from lark import UnexpectedToken, Token, Lark
+from lark.lexer import Lexer, TraditionalLexer
 from pygls.types import (Diagnostic, Range, Position)
 
-from .lark_grammar import lark_grammar_parser
+from .lark_grammar import lark_grammer
 
 
 def user_repr(error: Union[UnexpectedToken]):
@@ -13,13 +15,60 @@ def user_repr(error: Union[UnexpectedToken]):
     else:
         return str(error)
 
-_SOLUTIONS = {
-    frozenset({'COLON', 'LBRACE', 'DOT'}): 'COLON',
-    frozenset({'RULE'}): 'RULE',
-    frozenset({'RPAR'}): 'RPAR',
-    frozenset({'RSQB'}): 'RSQB',
-}
 
+class CustomLexerState:
+    __slots__ = 'tokens', 'index'
+
+    def __init__(self, tokens, index=0):
+        self.tokens = tokens
+        self.index = index
+
+    def __copy__(self):
+        return type(self)(self.tokens, self.index)
+
+
+class CustomLexer(Lexer):
+    def __init__(self, conf):
+        self.lexer = TraditionalLexer(conf)
+
+    def make_lexer_state(self, text):
+        lexer_state = self.lexer.make_lexer_state(text)
+        tokens = list(self.lexer.lex(lexer_state, None))
+        print(tokens)
+        return CustomLexerState(tokens)
+
+    def next_token(self, state):
+        if state.index >= len(state.tokens):
+            raise EOFError
+        state.index += 1
+        return state.tokens[state.index - 1]
+
+    def lex(self, state, parser_state):
+        with suppress(EOFError):
+            while True:
+                yield self.next_token(state)
+
+    def scroll_to(self, state, t):
+        while state.index < len(state.tokens):
+            if state.tokens[state.index].type == t:
+                break
+            else:
+                state.index += 1
+
+lark_debug_parser = Lark(lark_grammer, parser='lalr', debug=True, lexer=CustomLexer)
+
+
+states = lark_debug_parser.parser.parser.parser.parse_table.states
+
+target_rules = {'_item'}
+
+target_states = set()
+
+for s in states:
+    for r in s:
+        if r.rule.origin.name in target_rules and r.index == 0:
+            target_states.add(s)
+            break
 
 def get_diagnostics(doctext: str):
     diagnostics: List[Diagnostic] = []
@@ -32,21 +81,18 @@ def get_diagnostics(doctext: str):
                 Position(t.end_line - 1, t.end_column - 1)
             ),
             user_repr(e)))
-        if t.type == '_NL': # Try to save ourself from overreporting errors
-            logging.info(repr((t, t.line, t.end_line, t.column, t.end_column)))
-            accepts = e.puppet.accepts()
-            while frozenset(accepts) in _SOLUTIONS:
-                tt = _SOLUTIONS[frozenset(accepts)]
-                nt = Token.new_borrow_pos(tt, '<fill_token>', t)
-                e.puppet.feed_token(nt)
-                accepts = e.puppet.accepts()
-            if '_NL' not in accepts:
-                logging.warning('Unknown error situation with accepts: ' + str(accepts))
-            e.puppet.feed_token(t)
+        p = e.puppet
+        ps = p.parser_state
+        ls = p.lexer_state
+        ls.lexer.scroll_to(ls.state, '_NL')
+        ls.lexer.next_token(ls.state)
+        while ps.state_stack[-1] not in target_states:
+            ps.state_stack.pop()
+            ps.value_stack.pop()
         return True
 
     try:
-        lark_grammar_parser.parse(doctext, on_error=on_error)
+        lark_debug_parser.parse(doctext, on_error=on_error)
     except Exception:
         logging.exception("parser raised exception")
     return diagnostics
