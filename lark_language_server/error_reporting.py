@@ -59,15 +59,9 @@ bad_char_re = re.compile("[^']", re.U)
 
 
 def on_character_error(
-    e: UnexpectedCharacters, diagnostics: List[Diagnostic]
+        e: UnexpectedCharacters, text:str,  diagnostics: List[Diagnostic]
 ):
-    exception_msg = str(e)
-    skip_len = len("No terminal defined for '")
-    if bad_char_match := bad_char_re.match(exception_msg[skip_len:]):
-        bad_char = bad_char_match.group()
-    else:
-        bad_char = exception_msg[skip_len]
-
+    bad_char = text[e.pos_in_stream] 
     if bad_char != "'":
         message = f"Unexpected character '{bad_char}' "
     else:
@@ -88,17 +82,17 @@ def on_character_error(
     return True
 
 
-def on_error(e, diagnostics: List[Diagnostic]):
+def on_error(e, text: str ,diagnostics: List[Diagnostic]):
     if isinstance(e, UnexpectedToken):
         on_token_error(e, diagnostics)
     elif isinstance(e, UnexpectedCharacters):
-        on_character_error(e, diagnostics)
+        on_character_error(e,text,  diagnostics)
     return True
 
 
 def get_diagnostics(doctext: str):
     diagnostics: List[Diagnostic] = []
-    error_function = lambda error: on_error(error, diagnostics)
+    error_function = lambda error: on_error(error, doctext, diagnostics)
     try:
         lark_grammar_parser.parse(doctext, on_error=error_function)
     except Exception:
