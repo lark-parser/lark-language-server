@@ -57,7 +57,5 @@ def did_close(ls: LarkLanguageServer, params: DidCloseTextDocumentParams):
 async def did_open(ls: LarkLanguageServer, params: DidOpenTextDocumentParams):
     """Text document did open notification."""
     print('Text Document Did Open')
-    ls.show_message('Text Document Did Open')
+    ls.show_message(f'Text Document Did Open {params.textDocument.uri}')
     _validate(ls, params.textDocument.uri)
-
-print(lark_server)
