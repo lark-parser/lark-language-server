@@ -1,10 +1,11 @@
 import typing as t
-from pygls.features import (COMPLETION, TEXT_DOCUMENT_DID_CHANGE,
-                            TEXT_DOCUMENT_DID_CLOSE, TEXT_DOCUMENT_DID_OPEN)
+from pygls.lsp.methods import (COMPLETION, TEXT_DOCUMENT_DID_CHANGE,
+                               TEXT_DOCUMENT_DID_CLOSE, TEXT_DOCUMENT_DID_OPEN)
 from pygls.server import LanguageServer
-from pygls.types import (CompletionItem, CompletionList, CompletionParams,
-                         DidChangeTextDocumentParams,
-                         DidCloseTextDocumentParams, DidOpenTextDocumentParams)
+from pygls.lsp import (CompletionItem, CompletionList, CompletionParams,
+                       CompletionOptions,
+                       DidChangeTextDocumentParams,
+                       DidCloseTextDocumentParams, DidOpenTextDocumentParams)
 
 from .error_reporting import get_diagnostics
 
@@ -25,12 +26,12 @@ def _validate(ls: LarkLanguageServer, params: DidChangeTextDocumentParams):
     ls.publish_diagnostics(text_doc.uri, get_diagnostics(text_doc.source))
 
 
-@lark_server.feature(COMPLETION, trigger_characters=[','])
+@lark_server.feature(COMPLETION, CompletionOptions(trigger_characters=[',']))
 def completions(ls: LarkLanguageServer, params: CompletionParams = None):
     """Returns completion items."""
     ls.show_message_log('completion called @ {}'.format(params.position))
     items: t.List[CompletionItem] = []
-    return CompletionList(False, items)
+    return CompletionList(is_incomplete=False, items=items)
 
 
 @lark_server.feature(TEXT_DOCUMENT_DID_CHANGE)
