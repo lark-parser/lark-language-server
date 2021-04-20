@@ -1,7 +1,7 @@
 from typing import List, Union
 import logging
 from lark import UnexpectedToken
-from pygls.types import (Diagnostic, Range, Position)
+from pygls.lsp import (Diagnostic, Range, Position)
 
 from .lark_grammar import lark_grammar_parser
 
