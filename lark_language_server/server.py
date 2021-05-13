@@ -7,7 +7,7 @@ from pygls.types import (CompletionItem, CompletionList, CompletionParams,
                          DidCloseTextDocumentParams, DidOpenTextDocumentParams)
 
 from .error_reporting import get_diagnostics
-
+from .completions import get_locals_for
 
 class LarkLanguageServer(LanguageServer):
     CONFIGURATION_SECTION = 'larkLanguageServer'
@@ -29,7 +29,7 @@ def _validate(ls: LarkLanguageServer, params: DidChangeTextDocumentParams):
 def completions(ls: LarkLanguageServer, params: CompletionParams = None):
     """Returns completion items."""
     ls.show_message_log('completion called @ {}'.format(params.position))
-    items: t.List[CompletionItem] = []
+    items: t.List[CompletionItem] = get_locals_for(ls.workspace.get_document(params.textDocument.uri))
     return CompletionList(False, items)
 
 
