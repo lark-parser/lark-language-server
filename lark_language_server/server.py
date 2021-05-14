@@ -35,7 +35,7 @@ def _validate(ls: LarkLanguageServer, params: DidChangeTextDocumentParams):
     ls.publish_diagnostics(text_doc.uri, get_diagnostics(text_doc.source))
 
 
-@lark_server.feature(COMPLETION, trigger_characters=[",", ":"])
+@lark_server.feature(COMPLETION, trigger_characters=[",", ":", "|", "{"])
 def completions(ls: LarkLanguageServer, params: CompletionParams = None):
     """Returns completion items."""
     ls.show_message_log("completion called @ {}".format(params.position))
